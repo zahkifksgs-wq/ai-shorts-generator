@@ -10,17 +10,26 @@ import streamlit as st
 # Streamlit secrets se API Key read karega
 API_KEY = st.secrets["GEMINI_API_KEY"]
 
+import yt_dlp
+
 def download_video(url, output_path="input_video.mp4"):
     print("\n[Step 1/6] Downloading YouTube Video...")
-    command = [
-        'yt-dlp',
-        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        '--no-check-certificates',
-        '-f', 'mp4/b',
-        '-o', output_path,
-        url
-    ]
-    subprocess.run(command, check=True)
+    
+    # Existing file ko delete karein agar pehle se mojood ho
+    if os.path.exists(output_path):
+        os.remove(output_path)
+        
+    ydl_opts = {
+        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        'outtmpl': output_path,
+        'quiet': True,
+        'no_warnings': True,
+        'nocheckcertificate': True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+    
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([url])
 
 def extract_audio(video_path="input_video.mp4", audio_path="audio.mp3"):
     print("\n[Step 2/6] Extracting Audio...")
