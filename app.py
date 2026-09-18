@@ -24,12 +24,19 @@ selected_color = color_map[color_choice]
 tab1, tab2 = st.tabs(["⚡ Single Video Processing", "📦 Batch / Playlist Processing"])
 
 with tab1:
-    url = st.text_input("Enter Single YouTube Video Link:")
+    uploaded_file = st.file_uploader("Upload MP4 Video directly (Recommended Fallback):", type=["mp4"])
+    url = st.text_input("OR Enter Single YouTube Video Link:")
+    
     if st.button("Generate Short", type="primary"):
-        if url:
+        if uploaded_file is not None or url:
             with st.status("Processing Video...", expanded=True) as status:
-                st.write("📥 Downloading video...")
-                download_video(url)
+                if uploaded_file is not None:
+                    st.write("📥 Saving uploaded file...")
+                    with open("input_video.mp4", "wb") as f:
+                        f.write(uploaded_file.read())
+                else:
+                    st.write("📥 Downloading video from YouTube...")
+                    download_video(url)
                 
                 st.write("🎵 Extracting audio...")
                 extract_audio()

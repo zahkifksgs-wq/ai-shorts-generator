@@ -10,26 +10,43 @@ import streamlit as st
 # Streamlit secrets se API Key read karega
 API_KEY = st.secrets["GEMINI_API_KEY"]
 
+import os
 import yt_dlp
 
 def download_video(url, output_path="input_video.mp4"):
     print("\n[Step 1/6] Downloading YouTube Video...")
     
-    # Existing file ko delete karein agar pehle se mojood ho
     if os.path.exists(output_path):
         os.remove(output_path)
         
     ydl_opts = {
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        'format': 'best[ext=mp4]/best',
         'outtmpl': output_path,
         'quiet': True,
         'no_warnings': True,
         'nocheckcertificate': True,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        # Cloud Datacenter Bypassing Config
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'ios', 'web'],
+                'skip': ['hls', 'dash']
+            }
+        },
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-us',
+        }
     }
     
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+    except Exception as e:
+        print(f"Primary engine blocked. Retrying with alternative Android client fallback...")
+        ydl_opts['extractor_args']['youtube']['player_client'] = ['android_embedded']
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
 
 def extract_audio(video_path="input_video.mp4", audio_path="audio.mp3"):
     print("\n[Step 2/6] Extracting Audio...")
