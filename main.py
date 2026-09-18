@@ -7,41 +7,62 @@ import whisper
 import streamlit as st
 from google import genai
 
+# Secrets se API Key le ga
 API_KEY = st.secrets["GEMINI_API_KEY"]
 client = genai.Client(api_key=API_KEY)
 
-import requests
-import os
-
 def download_video(url, output_path="input_video.mp4"):
-    print("\n[Step 1/6] Fetching Video via External API...")
+    print("\n[Step 1/6] Extracting YouTube Video stream via Invidious Network...")
     if os.path.exists(output_path):
         os.remove(output_path)
-        
-    # Free Cobalt Engine - AWS/Streamlit Cloud IP Blocking Bypass
-    try:
-        api_url = "https://api.cobalt.tools/api/json"
-        payload = {"url": url, "vQuality": "720"}
-        headers = {
-            "Accept": "application/json", 
-            "Content-Type": "application/json"
-        }
-        
-        response = requests.post(api_url, json=payload, headers=headers)
-        data = response.json()
-        
-        if "url" in data:
-            video_bytes = requests.get(data["url"]).content
-            with open(output_path, "wb") as f:
-                f.write(video_bytes)
-            print("Download Complete via API!")
-            return
-        else:
-            raise Exception("API did not return a valid download link.")
-            
-    except Exception as e:
-        print(f"Primary API failed: {e}. Falling back to Direct File Upload Method.")
-        raise Exception("YouTube link downloading blocked by Cloud. Please use the 'Upload MP4 Video directly' option above!")
+
+    # Extract Video ID
+    video_id = ""
+    if "watch?v=" in url:
+        video_id = url.split("watch?v=")[1].split("&")[0]
+    elif "youtu.be/" in url:
+        video_id = url.split("youtu.be/")[1].split("?")[0]
+    elif "shorts/" in url:
+        video_id = url.split("shorts/")[1].split("?")[0]
+
+    if not video_id:
+        raise Exception("Invalid YouTube URL format!")
+
+    instances = [
+        "https://invidious.nerdvpn.de",
+        "https://inv.us.projectsegfau.lt",
+        "https://invidious.drgns.space",
+        "https://yewtu.be"
+    ]
+
+    download_success = False
+
+    for instance in instances:
+        try:
+            api_endpoint = f"{instance}/api/v1/videos/{video_id}"
+            res = requests.get(api_endpoint, timeout=10)
+            if res.status_code == 200:
+                data = res.json()
+                format_url = None
+                for fmt in data.get("formatStreams", []):
+                    if fmt.get("container") == "mp4":
+                        format_url = fmt.get("url")
+                        break
+                
+                if format_url:
+                    video_bytes = requests.get(format_url, stream=True, timeout=30)
+                    with open(output_path, "wb") as f:
+                        for chunk in video_bytes.iter_content(chunk_size=1024*1024):
+                            if chunk:
+                                f.write(chunk)
+                    download_success = True
+                    print(f"Successfully downloaded via {instance}")
+                    break
+        except Exception:
+            continue
+
+    if not download_success:
+        raise Exception("Cloud limit reached on YouTube links. Please use direct MP4 upload!")
 
 def extract_audio(video_path="input_video.mp4", audio_path="audio.mp3"):
     print("\n[Step 2/6] Extracting Audio...")
