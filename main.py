@@ -2,51 +2,47 @@ import os
 import json
 import time
 import subprocess
+import requests
 import whisper
+import streamlit as st
 from google import genai
 
-import streamlit as st
-
-# Streamlit secrets se API Key read karega
 API_KEY = st.secrets["GEMINI_API_KEY"]
-
-import os
-import yt_dlp
+client = genai.Client(api_key=API_KEY)
 
 def download_video(url, output_path="input_video.mp4"):
-    print("\n[Step 1/6] Downloading YouTube Video...")
-    
+    print("\n[Step 1/6] Downloading YouTube Video via Proxy API...")
     if os.path.exists(output_path):
         os.remove(output_path)
         
+    # Cobalt API Fallback for Cloud Hosting (Bypasses YouTube IP Blocking)
+    try:
+        api_url = "https://api.cobalt.tools/api/json"
+        payload = {"url": url, "vQuality": "720"}
+        headers = {"Accept": "application/json", "Content-Type": "application/json"}
+        
+        response = requests.post(api_url, json=payload, headers=headers)
+        data = response.json()
+        
+        if "url" in data:
+            video_data = requests.get(data["url"]).content
+            with open(output_path, "wb") as f:
+                f.write(video_data)
+            return
+    except Exception as e:
+        print(f"Proxy download failed: {e}. Falling back to yt-dlp...")
+
+    # Standard yt-dlp fallback
+    import yt_dlp
     ydl_opts = {
-        'format': 'best[ext=mp4]/best',
+        'format': 'best',
         'outtmpl': output_path,
         'quiet': True,
         'no_warnings': True,
-        'nocheckcertificate': True,
-        # Cloud Datacenter Bypassing Config
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['android', 'ios', 'web'],
-                'skip': ['hls', 'dash']
-            }
-        },
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-us',
-        }
+        'nocheckcertificate': True
     }
-    
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-    except Exception as e:
-        print(f"Primary engine blocked. Retrying with alternative Android client fallback...")
-        ydl_opts['extractor_args']['youtube']['player_client'] = ['android_embedded']
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([url])
 
 def extract_audio(video_path="input_video.mp4", audio_path="audio.mp3"):
     print("\n[Step 2/6] Extracting Audio...")
