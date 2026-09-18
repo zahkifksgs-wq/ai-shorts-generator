@@ -10,39 +10,38 @@ from google import genai
 API_KEY = st.secrets["GEMINI_API_KEY"]
 client = genai.Client(api_key=API_KEY)
 
+import requests
+import os
+
 def download_video(url, output_path="input_video.mp4"):
-    print("\n[Step 1/6] Downloading YouTube Video via Proxy API...")
+    print("\n[Step 1/6] Fetching Video via External API...")
     if os.path.exists(output_path):
         os.remove(output_path)
         
-    # Cobalt API Fallback for Cloud Hosting (Bypasses YouTube IP Blocking)
+    # Free Cobalt Engine - AWS/Streamlit Cloud IP Blocking Bypass
     try:
         api_url = "https://api.cobalt.tools/api/json"
         payload = {"url": url, "vQuality": "720"}
-        headers = {"Accept": "application/json", "Content-Type": "application/json"}
+        headers = {
+            "Accept": "application/json", 
+            "Content-Type": "application/json"
+        }
         
         response = requests.post(api_url, json=payload, headers=headers)
         data = response.json()
         
         if "url" in data:
-            video_data = requests.get(data["url"]).content
+            video_bytes = requests.get(data["url"]).content
             with open(output_path, "wb") as f:
-                f.write(video_data)
+                f.write(video_bytes)
+            print("Download Complete via API!")
             return
+        else:
+            raise Exception("API did not return a valid download link.")
+            
     except Exception as e:
-        print(f"Proxy download failed: {e}. Falling back to yt-dlp...")
-
-    # Standard yt-dlp fallback
-    import yt_dlp
-    ydl_opts = {
-        'format': 'best',
-        'outtmpl': output_path,
-        'quiet': True,
-        'no_warnings': True,
-        'nocheckcertificate': True
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+        print(f"Primary API failed: {e}. Falling back to Direct File Upload Method.")
+        raise Exception("YouTube link downloading blocked by Cloud. Please use the 'Upload MP4 Video directly' option above!")
 
 def extract_audio(video_path="input_video.mp4", audio_path="audio.mp3"):
     print("\n[Step 2/6] Extracting Audio...")
