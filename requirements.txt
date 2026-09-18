@@ -2,3 +2,4 @@ streamlit
 google-genai
 openai-whisper
 yt-dlp
+ffmpeg-python
